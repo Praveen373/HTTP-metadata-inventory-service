@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+
+  mongo:
+    image: mongo:7.0
+    container_name: metadata-mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: metadata_inventory
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: metadata-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      MONGO_URI: mongodb://mongo:27017
+      MONGO_DB_NAME: metadata_inventory
+      MONGO_COLLECTION_NAME: metadata
+      HTTP_TIMEOUT_SECONDS: "15.0"
+      HTTP_MAX_RETRIES: "2"
+      APP_ENV: development
+      LOG_LEVEL: INFO
+    depends_on:
+      mongo:
+        condition: service_healthy
+    # Mount source for local development (hot reload)
+    # Remove this volume block for production builds
+    volumes:
+      - ./app:/app/app
+
+volumes:
+  mongo_data:
+    driver: local
